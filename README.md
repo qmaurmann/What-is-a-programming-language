@@ -25,7 +25,16 @@ One runs a program by quoting it (in Racket) and passing it to the function run 
 
 The semantics are intended to be almost identical to Racket. I am aware of a few small differences:
 
-* The letrec form temporarily binds variables to #<void> rather than #<undefined>. As in Racket, this value can be leaked by an expression like
+* The letrec form temporarily binds variables to
+
+        #<void>
+
+rather than
+
+        #<undefined>.
+
+As in Racket, this value can be leaked by an expression like
+
         (letrec ([x x]) x)
 
 * You can't easily shadow the keywords and primitive operations. For instance,
