@@ -35,13 +35,18 @@ As in Racket, this value can be leaked by an expression like
 
         (letrec ([x x]) x)
 
+
 * You can't easily shadow the keywords and primitive operations. For instance,
+
         (let ([+ (lambda (x y) (* x y))]) (+ 5 5))
-evaluates 10, not 25 as it would in Racket. This is because, while + *is* a valid symbol, the form
+evaluates to 10, not 25 as it would in Racket. This is because, while + *is* a valid symbol, the form
+
         (+ <expr> <expr>)
 is is found before procedure application
+
         (<expr> <expr>*)
 and so the value of + is never looked up. If one *must* shadow the builtins, there's always the option to write things like
+
         (let ([apply2 (lambda (f x y) (f x y))]
               [+ (lambda (x y) (* x y))])
           (apply2 + 5 5))
