@@ -28,11 +28,9 @@ The semantics are intended to be almost identical to Racket. I am aware of a few
 * The letrec form temporarily binds variables to
 
         #<void>
-
 rather than
 
         #<undefined>.
-
 As in Racket, this value can be leaked by an expression like
 
         (letrec ([x x]) x)
