@@ -6,6 +6,7 @@
 ;; qmaurmann.wordpress.com/
 
 
+
 ;; 0. DATA DEFINITIONS
 
 ;; Supported syntax (a subset of Racket):
@@ -25,6 +26,9 @@
 ;;            | (letrec ([<symbol> <expr>]*) <expr>)
 ;;            | (<expr> <expr>*)
 
+;; From the REPL only, one may also use top-level definitions
+;;   <statement> ::= (repl-bind <symbol> <expr>)
+
 ;; Semantics (basically identical to Racket):
 ;;   <value>   ::= <number>
 ;;               | <boolean>
@@ -34,7 +38,7 @@
 ;;                                -- i.e. a heterogeneous 4-element list, beginning with the
 ;;                                -- symbol closure, followed by a list of symbols
 
-;; Data structures for eval:
+;; Data definitions for eval:
 ;;   <location>         ::= <integer>
 ;;   <name-binding>     ::= (<symbol> <location>)       -- i.e. a 2-element heterogeneous list
 ;;   <location-binding> ::= (<location> <value>)
@@ -44,6 +48,9 @@
 ;; Invariant: the additional location carried by a store is to be the max of all
 ;; locations used in the list of location-bindings (so that fresh locations can easily
 ;; be found)
+
+;; Possible future TODO: change environments and stores from association lists to AVL or
+;; red-black trees for efficiency.
 
 
 
@@ -193,8 +200,8 @@
 
 (define (eval-set! expr env sto)
   (match expr
-    [(list 'set! (? symbol? var) expr)
-     (match (eval expr env sto)
+    [(list 'set! (? symbol? var) expr1)
+     (match (eval expr1 env sto)
        [(list val sto1)
         (match (assoc var env)
           [(list _ loc) (list (void) (extend-store loc val sto1))]
@@ -269,7 +276,7 @@
 
 
 
-;; 3. RUN SELECTED TESTS
+;; 3. SELECTED TESTS
 
 
 (define set!-test                       ;; correct value: 5
@@ -280,12 +287,12 @@
                  y))
        x)))
 
-(define fact-test                       ;; correct value: 720
-  '(letrec ([fact (lambda (n)
+(define fact-test                       ;; correct value: 9332...0000,
+  '(letrec ([fact (lambda (n)           ;; a 158-digit number
                     (if (= n 0)
                         1
                         (* n (fact (+ n -1)))))])
-     (fact 6)))
+     (fact 100)))
 
 (define acc-test                        ;; correct value: 222
   '(letrec ([make-accumulator
@@ -302,9 +309,51 @@
                     (b 5)
                     (a 100))))))))
 
-
-
+;; For testing: Uncomment the (map run ...) line below to test above programs before launching repl
 (define (run expr)
   (first (eval expr default-env default-sto)))
 
-(map run (list set!-test fact-test acc-test))
+;; (map run (list set!-test fact-test acc-test))
+
+
+
+;; 4. REPL
+
+(define (show value)
+  (match value
+    [(? number? _) (displayln value)]
+    [(? boolean? _) (displayln value)]
+    [(? void? _) (void)]
+    [(cons 'closure _) (displayln "#<procedure>")]
+    [else (error "internal error: bad value to show")]))
+
+;; Inelegant, and possibly repeating myself (I'm basically re-implementing a more
+;; complex letrec by hand, although only in one variable). The trickiness here is due
+;; to passing *environments* between function calls, rather than just stores.
+
+(define (repl env sto)
+  (let ([expr (read)])
+    (match expr
+      [(cons 'repl-bind more)
+       (match more
+         [(list (? symbol? s) expr1)
+          (match sto
+            [(list pairs mx)
+             (let* ([new-loc (+ 1 mx)]                              ;; create "empty"
+                    [env1 (cons (list s new-loc) env)]              ;; location before
+                    [sto1 (list (cons (list new-loc (void)) pairs)  ;; evalutating expr1
+                                (+ 1 new-loc))])
+               (match (eval expr1 env1 sto1)                        ;; then eval
+                 [(list value (list sto2-pairs sto2-mx))
+                  (repl env1 (list (cons (list new-loc value) sto2-pairs)  ;; then rebind
+                                   sto2-mx))]
+                 [else (error "internal error: bad return in eval in repl")]))]
+            [else (error "internal error: bad store returned in repl")])]
+         [else (error "error: bad repl-bind statement:" expr)])]
+      [else (match (eval expr env sto)
+              [(list val new-sto)
+               (show val)
+               (repl env new-sto)]
+              [else (error "internal error: bad return in eval in repl")])])))
+
+(repl default-env default-sto)  ;; start it!
